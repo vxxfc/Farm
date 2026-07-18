@@ -49,6 +49,24 @@ jobs:
             echo "$FILE already has the padding import, skipping"
           fi
 
+      # Known source fix: MoreScreen.kt declares "val items = listOf(...)" which
+      # shadows the imported items() composable from androidx.compose.foundation.lazy,
+      # then tries to call items(items) { ... } — the local List can't be invoked as
+      # a function, causing an unresolved reference / compile error.
+      # Patched here at build-time so CI passes even if the source file
+      # upstream hasn't been fixed yet. Safe to remove once the fix is
+      # committed directly to MoreScreen.kt.
+      - name: Patch items shadowing in MoreScreen
+        run: |
+          FILE=app/src/main/java/com/farmmanager/app/ui/more/MoreScreen.kt
+          if grep -q "val items = listOf(" "$FILE"; then
+            sed -i 's/val items = listOf(/val destinations = listOf(/' "$FILE"
+            sed -i 's/items(items) { destination ->/items(destinations) { destination ->/' "$FILE"
+            echo "Patched $FILE"
+          else
+            echo "$FILE already patched, skipping"
+          fi
+
       - name: Lint
         run: gradle lint --stacktrace
 
